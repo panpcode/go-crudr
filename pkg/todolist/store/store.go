@@ -16,5 +16,6 @@ type Txn interface {
 	Update(ctx context.Context, e *structs.TodoItem) error
 	Get(ctx context.Context, id string, item *structs.TodoItem) error
 	List(ctx context.Context, items *structs.TodoItemList) error
+	Reorder(ctx context.Context, id string, newOrder int) error
 	DbTx() interface{}
 }

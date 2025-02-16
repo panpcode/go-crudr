@@ -4,154 +4,136 @@ import (
 	"context"
 	"testing"
 
-	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
-	sqlitedb "go.altair.com/todolist/pkg/db"
+	"github.com/stretchr/testify/assert"
 	"go.altair.com/todolist/pkg/structs"
 )
 
-var testingT *testing.T
-
-func TestTodoSqlStorage(t *testing.T) {
-	testingT = t
-	RegisterFailHandler(Fail)
-
-	RunSpecs(t, "store suite")
+func setupMockDB(t *testing.T) (*sqlx.DB, sqlmock.Sqlmock) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	sqlxDB := sqlx.NewDb(db, "sqlmock")
+	return sqlxDB, mock
 }
 
-var _ = Describe("SQL Store tests", func() {
-	var tododb *sqlx.DB
-	var todostore Store
-	var ctx context.Context
+func TestAdd(t *testing.T) {
+	db, mock := setupMockDB(t)
+	defer db.Close()
 
-	Context("When database created", Ordered, func() {
+	store := NewSqlStore(db)
+	ctx := context.Background()
 
-		BeforeAll(func() {
-			var err error
-			tododb, err = sqlitedb.CreateDb()
-			Expect(err).NotTo(HaveOccurred())
-			todostore = NewSqlStore(tododb)
-			ctx = context.Background()
-		})
+	todoItem := &structs.TodoItem{
+		Id:    uuid.New().String(),
+		Item:  "Test Item",
+		Order: 1,
+	}
 
-		AfterAll(func() {
-			err := tododb.Close()
-			Expect(err).NotTo(HaveOccurred())
-		})
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM TODOLIST`).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectExec(`INSERT INTO TODOLIST`).WithArgs(todoItem.Id, todoItem.Item, todoItem.Order).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
 
-		Specify("List returns empty", func() {
-			var items structs.TodoItemList
-
-			err := todostore.Update(func(tx Txn) error {
-				return tx.List(ctx, &items)
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(items.Items).To(BeEmpty())
-			Expect(items.Count).To(Equal(0))
-		})
-
-		Context("When todo item created", func() {
-			var item structs.TodoItem
-			BeforeEach(func() {
-				item = structs.TodoItem{Id: "7efc0335-8da6-45f7-a9b6-d4a46ba3044b", Item: "Service motorbike"}
-				err := todostore.Update(func(tx Txn) error {
-					return tx.Add(ctx, &item)
-				})
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			AfterEach(func() {
-				item = structs.TodoItem{Id: "7efc0335-8da6-45f7-a9b6-d4a46ba3044b", Item: "Service motorbike"}
-				err := todostore.Update(func(tx Txn) error {
-					return tx.Delete(ctx, item.Id)
-				})
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			Specify("Item is returned from get", func() {
-				var gItem structs.TodoItem
-				err := todostore.Update(func(tx Txn) error {
-					return tx.Get(ctx, item.Id, &gItem)
-				})
-
-				Expect(err).NotTo(HaveOccurred())
-				Expect(gItem).To(Equal(item))
-			})
-
-			Specify("Item is returned from List", func() {
-				var items structs.TodoItemList
-
-				err := todostore.Update(func(tx Txn) error {
-					return tx.List(ctx, &items)
-				})
-				Expect(err).NotTo(HaveOccurred())
-				Expect(items.Count).To(Equal(1))
-				Expect(items.Items).To(ContainElement(item))
-			})
-
-			Context("When todo item modified", func() {
-				var updatedItem structs.TodoItem
-				BeforeEach(func() {
-					updatedItem = structs.TodoItem{Id: "7efc0335-8da6-45f7-a9b6-d4a46ba3044b", Item: "Service motorbike and book MOT"}
-					err := todostore.Update(func(tx Txn) error {
-						return tx.Update(ctx, &updatedItem)
-					})
-					Expect(err).NotTo(HaveOccurred())
-				})
-
-				Specify("Item is returned from get", func() {
-					var gItem structs.TodoItem
-					err := todostore.Update(func(tx Txn) error {
-						return tx.Get(ctx, item.Id, &gItem)
-					})
-
-					Expect(err).NotTo(HaveOccurred())
-					Expect(gItem).To(Equal(updatedItem))
-					Expect(gItem).NotTo(Equal(item))
-				})
-			})
-
-			Context("When second todo item created", func() {
-				var secondItem structs.TodoItem
-				BeforeEach(func() {
-					secondItem = structs.TodoItem{Id: "dac2581f-9c76-47aa-877e-6c15ddcfb064", Item: "Book holiday"}
-					err := todostore.Update(func(tx Txn) error {
-						return tx.Add(ctx, &secondItem)
-					})
-					Expect(err).NotTo(HaveOccurred())
-				})
-
-				AfterEach(func() {
-					err := todostore.Update(func(tx Txn) error {
-						return tx.Delete(ctx, secondItem.Id)
-					})
-					Expect(err).NotTo(HaveOccurred())
-				})
-
-				Specify("Item is returned from get", func() {
-					var gItem structs.TodoItem
-					err := todostore.Update(func(tx Txn) error {
-						return tx.Get(ctx, secondItem.Id, &gItem)
-					})
-
-					Expect(err).NotTo(HaveOccurred())
-					Expect(gItem).To(Equal(secondItem))
-				})
-
-				Specify("Item is returned from List", func() {
-					var items structs.TodoItemList
-
-					err := todostore.Update(func(tx Txn) error {
-						return tx.List(ctx, &items)
-					})
-					Expect(err).NotTo(HaveOccurred())
-					Expect(items.Count).To(Equal(2))
-					Expect(items.Items).To(ContainElements(item, secondItem))
-				})
-			})
-		})
+	err := store.Update(func(tx Txn) error {
+		return tx.Add(ctx, todoItem)
 	})
-})
+
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDelete(t *testing.T) {
+	db, mock := setupMockDB(t)
+	defer db.Close()
+
+	store := NewSqlStore(db)
+	ctx := context.Background()
+	id := uuid.New().String()
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`DELETE FROM TODOLIST WHERE ID=\?`).WithArgs(id).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	err := store.Update(func(tx Txn) error {
+		return tx.Delete(ctx, id)
+	})
+
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUpdate(t *testing.T) {
+	db, mock := setupMockDB(t)
+	defer db.Close()
+
+	store := NewSqlStore(db)
+	ctx := context.Background()
+
+	todoItem := &structs.TodoItem{
+		Id:    uuid.New().String(),
+		Item:  "Updated Item",
+		Order: 1,
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT "ORDER" FROM TODOLIST WHERE "ORDER" = \? AND ID != \? LIMIT 1`).WithArgs(todoItem.Order, todoItem.Id).WillReturnRows(sqlmock.NewRows([]string{"ORDER"}))
+	mock.ExpectExec(`UPDATE TODOLIST SET ITEM = \?, "ORDER" = \? WHERE ID = \?`).WithArgs(todoItem.Item, todoItem.Order, todoItem.Id).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	err := store.Update(func(tx Txn) error {
+		return tx.Update(ctx, todoItem)
+	})
+
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestGet(t *testing.T) {
+	db, mock := setupMockDB(t)
+	defer db.Close()
+
+	store := NewSqlStore(db)
+	ctx := context.Background()
+	id := uuid.New().String()
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT ID, ITEM, "ORDER" FROM TODOLIST WHERE ID=\?`).WithArgs(id).WillReturnRows(sqlmock.NewRows([]string{"ID", "ITEM", "ORDER"}).AddRow(id, "Test Item", 1))
+	mock.ExpectCommit()
+
+	var todoItem structs.TodoItem
+	err := store.Update(func(tx Txn) error {
+		return tx.Get(ctx, id, &todoItem)
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "Test Item", todoItem.Item)
+	assert.Equal(t, 1, todoItem.Order)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestList(t *testing.T) {
+	db, mock := setupMockDB(t)
+	defer db.Close()
+
+	store := NewSqlStore(db)
+	ctx := context.Background()
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT ID, ITEM, "ORDER" FROM TODOLIST`).WillReturnRows(sqlmock.NewRows([]string{"ID", "ITEM", "ORDER"}).AddRow(uuid.New().String(), "Test Item 1", 1).AddRow(uuid.New().String(), "Test Item 2", 2))
+	mock.ExpectCommit()
+
+	var todoItemList structs.TodoItemList
+	err := store.Update(func(tx Txn) error {
+		return tx.List(ctx, &todoItemList)
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, todoItemList.Count)
+	assert.Equal(t, "Test Item 1", todoItemList.Items[0].Item)
+	assert.Equal(t, "Test Item 2", todoItemList.Items[1].Item)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}

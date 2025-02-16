@@ -80,7 +80,7 @@ var _ = Describe("Todo Serve tests", func() {
 		Context("When todo item created", func() {
 			var item structs.TodoItem
 			BeforeEach(func() {
-				item = structs.TodoItem{Id: "7efc0335-8da6-45f7-a9b6-d4a46ba3044b", Item: "Service motorbike"}
+				item = structs.TodoItem{Id: "7efc0335-8da6-45f7-a9b6-d4a46ba3044b", Item: "Service motorbike", Order: 1}
 				resp := testRequest(
 					ts,
 					"POST",
@@ -146,7 +146,7 @@ var _ = Describe("Todo Serve tests", func() {
 			Context("When second todo item created", func() {
 				var secondItem structs.TodoItem
 				BeforeEach(func() {
-					secondItem = structs.TodoItem{Id: "dac2581f-9c76-47aa-877e-6c15ddcfb064", Item: "Book holiday"}
+					secondItem = structs.TodoItem{Id: "dac2581f-9c76-47aa-877e-6c15ddcfb064", Item: "Book holiday", Order: 2}
 					resp := testRequest(
 						ts,
 						"POST",

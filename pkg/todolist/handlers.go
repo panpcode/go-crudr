@@ -25,6 +25,7 @@ func (h *ItemsHandlers) ConfigureRoutes(r chi.Router) {
 			r.Get("/", h.getItem)
 			r.Put("/", h.updateItem)
 			r.Delete("/", h.deleteItem)
+			r.Put("/reorder", h.reorderItem)
 		})
 	})
 }
@@ -49,9 +50,15 @@ func (h *ItemsHandlers) createItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = structs.ValidateStruct(&item)
+	if err != nil {
+		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	err = h.ItemsService.AddItem(r.Context(), &item)
 	if err != nil {
-		http.Error(w, "Failed", http.StatusBadRequest)
+		http.Error(w, "Failed because the same ID was found for another item", http.StatusBadRequest)
 		return
 	}
 
@@ -74,7 +81,7 @@ func (h *ItemsHandlers) deleteItem(w http.ResponseWriter, r *http.Request) {
 	deploymentId := chi.URLParam(r, "id")
 	err := h.ItemsService.DeleteItem(r.Context(), deploymentId)
 	if err != nil {
-		http.Error(w, "Failed", http.StatusBadRequest)
+		http.Error(w, "Failed to delete", http.StatusBadRequest)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -94,7 +101,7 @@ func (h *ItemsHandlers) updateItem(w http.ResponseWriter, r *http.Request) {
 
 	err = h.ItemsService.UpdateItem(r.Context(), &item)
 	if err != nil {
-		http.Error(w, "Failed", http.StatusBadRequest)
+		http.Error(w, "Failed to update", http.StatusBadRequest)
 		return
 	}
 
@@ -106,11 +113,36 @@ func (h *ItemsHandlers) getItem(w http.ResponseWriter, r *http.Request) {
 
 	deployment, err := h.ItemsService.GetItem(r.Context(), deploymentId)
 	if err != nil {
-		http.Error(w, "Failed", http.StatusBadRequest)
+		http.Error(w, "Failed to get an item with this ID", http.StatusBadRequest)
 		return
 	}
 
 	w.Header().Add("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(deployment)
+}
+
+func (h *ItemsHandlers) reorderItem(w http.ResponseWriter, r *http.Request) {
+	itemId := chi.URLParam(r, "id")
+
+	var itemToReorder structs.ReorderRequest
+	err := requestAs(r, &itemToReorder)
+	if err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	err = structs.ValidateStruct(&itemToReorder)
+	if err != nil {
+		http.Error(w, "Validation failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = h.ItemsService.ReorderItems(r.Context(), itemId, itemToReorder.Order)
+	if err != nil {
+		http.Error(w, "Failed to reorder item", http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }

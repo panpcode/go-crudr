@@ -26,8 +26,9 @@ func CreateDb() (*sqlx.DB, error) {
 	var schema = `
 DROP TABLE IF EXISTS todolist;
 CREATE TABLE todolist (
-	id    CHAR(40) NOT NULL,
-	item   VARCHAR(250) NOT NULL,
+    id    CHAR(40) NOT NULL,
+    item  VARCHAR(250) NOT NULL,
+    "order" INTEGER NOT NULL,
     CONSTRAINT rid_pkey PRIMARY KEY (id)
 );
 `
