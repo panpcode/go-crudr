@@ -58,7 +58,8 @@ func (h *ItemsHandlers) createItem(w http.ResponseWriter, r *http.Request) {
 
 	err = h.ItemsService.AddItem(r.Context(), &item)
 	if err != nil {
-		http.Error(w, "Failed because the same ID was found for another item", http.StatusBadRequest)
+		// return the actual err message
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 

@@ -9,26 +9,28 @@
 
 # Testing the functionality of the new ordering system
 
-Assuming we want to provide the 3 integer as the new Order to an existing todolist's ID the UUID: 304cc3f8-7b31-43d9-a28f-1d90b529642e. 
+Assuming we want to provide the 3 integer as the new order to an existing todolist's ID the UUID: 304cc3f8-7b31-43d9-a28f-1d90b529642e. 
 
     1. Curl command
 
     curl -X PUT http://localhost:8080/todolist/304cc3f8-7b31-43d9-a28f-1d90b529642e/reorder \
          -H "Content-Type: application/json" \
-             -d '{"Order": 5}'
+             -d '{"Order": 3}'
 
     2. Postman approach 
 
     Selecting the PUT method, adding the URL: "localhost:8080/todolist/304cc3f8-7b31-43d9-a28f-1d90b529642e/reorder" and providing the following body:
 
     {
-      "Order": 5
+      "Order": 3
     }
 
 
 # Cmd for quick generation of a list with items
 
     curl -X POST http://localhost:8080/todolist -H "Content-Type: application/json" -d '{"Item": "panos", "id": "304cc3f8-7b31-43d9-a28f-1d90b529642e", "Order": 1}' ; curl -X POST http://localhost:8080/todolist -H "Content-Type: application/json" -d '{"Item": "geo", "Id": "2bceaaa4-198d-4180-9ad8-2ceaa452b8f3", "Order": 2}' ; curl -X POST http://localhost:8080/todolist -H "Content-Type: application/json" -d '{"Item": "stavr", "id": "a94ca515-622a-4fac-9df0-96c54c039ca8", "Order": 3}' ; curl -X POST http://localhost:8080/todolist -H "Content-Type: application/json" -d '{"Item": "kostas", "Order": 4}' ; curl -X POST http://localhost:8080/todolist -H "Content-Type: application/json" -d '{"Item": "nekta", "Order": 5}'
+
+    Also available through the `make run` rule.
 
 
 # Checking the diff of my changes 

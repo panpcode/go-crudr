@@ -13,7 +13,7 @@ type ItemsService interface {
 	UpdateItem(ctx context.Context, def *structs.TodoItem) error
 	GetItem(ctx context.Context, id string) (*structs.TodoItem, error)
 	ListItems(ctx context.Context) (structs.TodoItemList, error)
-	ReorderItems(ctx context.Context, id string, newOrder int) error
+	ReorderItems(ctx context.Context, id string, newOrder int) error // New method
 }
 
 func NewItemsService(s store.Store) ItemsService {

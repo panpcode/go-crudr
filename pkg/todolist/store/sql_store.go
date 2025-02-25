@@ -93,21 +93,26 @@ func (tx *sqlStoreTxn) checkIfOrderExists(ctx context.Context, order int, id str
 }
 
 func (tx *sqlStoreTxn) Add(ctx context.Context, record *structs.TodoItem) error {
-
-	// Generate an UUID if the ID is empty
+	// Generate a UUID if the ID is empty
 	if record.Id == "" {
 		record.Id = uuid.New().String()
 	}
 
-	// check if any other item exists in sql
+	// Check if any other item exists in the SQL
 	var count int
 	err := tx.txn.GetContext(ctx, &count, `SELECT COUNT(*) FROM TODOLIST`)
 	if err != nil {
 		log.Debug().Msg(fmt.Sprintf("Failed to get the count of items: %v", err))
+		return err
 	}
-	if count != 0 {
 
-		// the provided order of the new item has to be greater by 1, than the current max order
+	if count == 0 {
+		// If no other items exist, the order should be 1
+		if record.Order != 1 {
+			return fmt.Errorf("order should be 1 for the first item, but got %d", record.Order)
+		}
+	} else {
+		// Otherwise, the provided order of the new item has to be greater by 1 from the current max order
 		var maxOrder int
 		err = tx.txn.GetContext(ctx, &maxOrder, `SELECT MAX("ORDER") FROM TODOLIST`)
 		if err != nil {
@@ -115,9 +120,8 @@ func (tx *sqlStoreTxn) Add(ctx context.Context, record *structs.TodoItem) error 
 			return err
 		}
 		if record.Order != maxOrder+1 {
-			return fmt.Errorf("order should be %d", maxOrder+1)
+			return fmt.Errorf("order should be %d and you provided %d", maxOrder+1, record.Order)
 		}
-
 	}
 
 	_, err = tx.txn.ExecContext(ctx,
@@ -191,7 +195,7 @@ func (tx *sqlStoreTxn) Update(ctx context.Context, record *structs.TodoItem) err
 	return nil
 }
 
-func (tx *sqlStoreTxn) reorderItems(ctx context.Context, reorderQuery string, newOrder, currentOrder int) error {
+func (tx *sqlStoreTxn) ReorderItems(ctx context.Context, reorderQuery string, newOrder, currentOrder int) error {
 
 	rows, err := tx.txn.QueryContext(ctx, tx.txn.Rebind(reorderQuery), newOrder, currentOrder)
 	if err != nil {
@@ -239,7 +243,6 @@ func (tx *sqlStoreTxn) Reorder(ctx context.Context, id string, newOrder int) err
 		return err
 	}
 
-	// Get the current order of the item
 	var currentOrder int
 	err = tx.txn.GetContext(ctx, &currentOrder, `SELECT "ORDER" FROM TODOLIST WHERE ID = ?`, id)
 	if err != nil {
@@ -266,7 +269,7 @@ func (tx *sqlStoreTxn) Reorder(ctx context.Context, id string, newOrder int) err
 	}
 	defer rows.Close()
 
-	err = tx.reorderItems(ctx, reorderQuery, newOrder, currentOrder)
+	err = tx.ReorderItems(ctx, reorderQuery, newOrder, currentOrder)
 	if err != nil {
 		return err
 	}
